@@ -2,7 +2,7 @@
 
 #### 5.2.1 顶点/片元着色器的基本结构
 
-```
+```c++
 Shader "Unity Shader Book/Chapter5/SimpleShader"
 {
     SubShader{
@@ -13,7 +13,6 @@ Shader "Unity Shader Book/Chapter5/SimpleShader"
             #pragma fragment frag
 
             float4 vert(float4 v : POSITION) : SV_POSITION{
-            // 更新提示: 'mul(UNITY_MATRIX_MVP,*)' 替换为 'UnityObjectToClipPos(*)'
                 return mul(UNITY_MATRIX_MVP, v);
             }
             fixed4 frag() : SV_Target{
@@ -202,8 +201,8 @@ Shader "Unity Shader Book/Chapter5/SimpleShader"
   | -------------------------------------------- | ------------------------------------------------------------ |
   | float3 WorldSpaceViewDir(float4 v)           | 输入一个模型空间的顶点位置，返回世界空间中从该点到摄像机的观察方向 |
   | float3 ObjSpaceViewDir(float4 v)             | 输入一个模型空间中的顶点位置，返回模型空间中从该点到摄像机的观察方向 |
-  | float3 WorldSpaceLightDir(float4 v)          | 仅可用于前向缓冲中。输入一个模型空间中的顶点位置，返回世界空间中从该点到光源的光照方向，未归一化 |
-  | float3 ObjSpaceLightDir(float4 v)            | 仅可用于前向渲染中。输入一个模型空间中的顶点位置，返回模型空间中从该点到光源的光照方向，没有归一化 |
+  | float3 WorldSpaceLightDir(float4 v)          | 仅可用于前向渲染中。输入一个模型空间中的顶点位置，返回世界空间中从该点到光源的光照方向，未归一化 |
+  | float3 ObjSpaceLightDir(float4 v)            | 仅可用于前向渲染中。输入一个模型空间中的顶点位置，返回模型空间中从该点到光源的光照方向，未归一化 |
   | float3 UnityObjectToWorldNormal(float3 norm) | 把法线方向从模型空间转换到世界空间中                         |
   | float3 UnityObjectToWorldDir(float3 dir)     | 把方向矢量从模型空间变换到世界空间中                         |
   | float3 UnityWorldToObjectDir(float3 dir)     | 把方向矢量从世界空间变换到模型空间中                         |
@@ -220,7 +219,7 @@ Shader "Unity Shader Book/Chapter5/SimpleShader"
 - 语义实际上是一个赋给Shader输入和输出的字符串，其表达了参数的含义，让Shader知道从哪里读取数据，并把数据输出到哪里，他们在Cg/HLSL的Shader流水线是不可或缺的
 - Unity并没有支持所有的语义
 - 通常情况下，输入输出变量并不需要有特别的意义，可以自行决定这些变量的用途。Unity为了方便对模型数据的传输，对一些语义进行了特别的含义规定，如顶点着色器中输入变量TEXCOORD0，Unity会识别并将模型的第一组纹理坐标填充进去，但对于片元着色器则没有该限定，用户可以自己决定
-- 在DirectX10以后有一种新的语义类型，即系统数值语义，以SV（sytem-value）开头，它们在渲染流水线中有特殊含义，描述的变量是不可以随便赋值的，流水线需要使用它们完成特定的目的。在大多数平台上，很多带SV和不带SV语义是等价的，但在某些平台必须用SV修饰，否则无法工作，所以
+- 在DirectX10以后有一种新的语义类型，即系统数值语义，以SV（sytem-value）开头，它们在渲染流水线中有特殊含义，描述的变量是不可以随便赋值的，流水线需要使用它们完成特定的目的。在大多数平台上，很多带SV和不带SV语义是等价的，但在某些平台必须用SV修饰，否则无法工作，所以最好使用带SV的语义
 
 #### 5.4.2 Unity支持的语义
 
@@ -256,7 +255,7 @@ Shader "Unity Shader Book/Chapter5/SimpleShader"
 - 假彩色图像：指的是用假彩色技术生成的一种图像，其对应的是照片这种真彩色图像。一张加彩色图像可以用于可视化一些数据
 - 主要思想是把需要调试的变量映射到[0,1]，把它们作为颜色输出到屏幕上，然后通过屏幕上显式的像素颜色来判断这个值是否正确。由于颜色的分量范围在[0, 1]，因此需要小心处理需要调试的变量的范围，若已知它的值域范围，可以把它映射到[0, 1]之间再进行输出，若不知道一个变量的范围，则只能不停的实验，任何大于1的值会被设为1，小于0的值设为0
 
-```
+```c++
 // Upgrade NOTE: replaced 'mul(UNITY_MATRIX_MVP,*)' with 'UnityObjectToClipPos(*)'
 
 Shader "Unity Shaders Book/Chapter 5/False Color"
@@ -275,7 +274,7 @@ Shader "Unity Shaders Book/Chapter 5/False Color"
                 float4 pos : SV_POSITION;
                 fixed4 color : COLOR0;
             };
-            //appdata_full在UnityCG.cginc中，几乎包含了所哟逇模型数据
+            //appdata_full在UnityCG.cginc中，几乎包含了所有模型数据
             v2f vert(appdata_full v) {
                 v2f o;
                 o.pos = UnityObjectToClipPos(v.vertex);
@@ -310,9 +309,7 @@ Shader "Unity Shaders Book/Chapter 5/False Color"
             }
 
             ENDCG
-
         }
-    
     }
 }
 ```
@@ -324,7 +321,7 @@ Shader "Unity Shaders Book/Chapter 5/False Color"
 #### 5.6.1 渲染纹理的坐标差异
 
 - OpenGL和DirectX在水平方向上数值的变化方向是相同的，但在竖直方向上两者是相反的，OpenGL中（0，0）对应了屏幕左下角，但在DirectX对应左上角。大多数情况下该差异不会造成影响，但要使用渲染到纹理技术时，把屏幕图像渲染到一张纹理中时，若不采取任何措施的话，就会出现纹理翻转的情况，Unity在背后处理了这种翻转问题
-- 若开启了抗锯齿（Edit->Project Settings->Quality->Anti Aliasing）并在此时使用了渲染到纹理技术，该情况下Unity先渲染得到屏幕图像，由硬件进行抗锯齿处理后得到一张渲染纹理供用户进行后续处理，此时在DirectX平台下得到的输入屏幕图像并不会被Unity翻转，因为对屏幕图像的采样坐标是需要符合DirectX平台规定的。若屏幕特效只需要处理一张渲染图像，仍然不需要在意纹理的翻转问题，在代用Graphics.Blit函数时，Unity已经对屏幕图像的采样坐标进行了处理，只需要按正常的采样过程处理屏幕图像即可。若同时处理多张渲染图像，这些图像在竖直方向的朝向可能是不同的，需要在顶点着色器中翻转某些渲染纹理的纵坐标，使之都符合DirectX平台的规则
+- 若开启了抗锯齿（Edit->Project Settings->Quality->Anti Aliasing）并在此时使用了渲染到纹理技术，该情况下Unity先渲染得到屏幕图像，由硬件进行抗锯齿处理后得到一张渲染纹理供用户进行后续处理，此时在DirectX平台下得到的输入屏幕图像并不会被Unity翻转，因为对屏幕图像的采样坐标是需要符合DirectX平台规定的。若屏幕特效只需要处理一张渲染图像，仍然不需要在意纹理的翻转问题，在使用Graphics.Blit函数时，Unity已经对屏幕图像的采样坐标进行了处理，只需要按正常的采样过程处理屏幕图像即可。若同时处理多张渲染图像，这些图像在竖直方向的朝向可能是不同的，需要在顶点着色器中翻转某些渲染纹理的纵坐标，使之都符合DirectX平台的规则
 
 #### 5.6.2 Shader的语法差异
 

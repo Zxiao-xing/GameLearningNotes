@@ -1,7 +1,7 @@
-### 6.1 我们是如何考到这个世界的
+### 6.1 我们是如何观察到这个世界的
 
 - 模拟真实光照环境来生成一张图像，需要考虑三种物理现象：
-  1. 光线从官员中被发射出来
+  1. 光线从光源中被发射出来
   2. 光线和场景中一些物体相交，一些光被物体吸收了，而另一些光被散射到其他方向
   3. 摄像机吸收了一些光，产生了一张图像
 
@@ -39,7 +39,7 @@
 
 #### 6.4.1 逐顶点光照
 
-```
+```c++
 // 逐顶点漫反射光照
 Shader "Unity Shader Book/Chapter 6/Diffuse Vertex Level"{
 
@@ -102,7 +102,7 @@ Shader "Unity Shader Book/Chapter 6/Diffuse Vertex Level"{
 
 #### 6.4.2 逐像素光照
 
-```
+```c++
 // 逐像素漫反射光照
 Shader "Unity Shader Book/Chapter 6/Diffuse Vertex Level"{
 
@@ -180,7 +180,7 @@ Shader "Unity Shader Book/Chapter 6/Diffuse Vertex Level"{
 
 #### 6.5.1 逐顶点光照
 
-```
+```c++
 Shader "Unity Shader Book/Chapter 6/Specular VertexLevel"{
 
 	Properties{
@@ -243,9 +243,7 @@ Shader "Unity Shader Book/Chapter 6/Specular VertexLevel"{
 
 #### 6.5.2 逐像素光照
 
-```
-// Upgrade NOTE: replaced 'mul(UNITY_MATRIX_MVP,*)' with 'UnityObjectToClipPos(*)'
-
+```c++
 Shader "Unity Shader Book/Chapter 6/Specular PixelLevel"{
 	Properties{
 		_Diffuse("Diffuse", Color) = (1, 1, 1, 1)
@@ -283,9 +281,7 @@ Shader "Unity Shader Book/Chapter 6/Specular PixelLevel"{
 				v2f o;
 
 				o.pos = UnityObjectToClipPos(v.vertex);
-
 				o.worldNormal = normalize(mul(v.normal, (float3x3)unity_WorldToObject));
-
 				o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
 
 				return o;
@@ -295,13 +291,10 @@ Shader "Unity Shader Book/Chapter 6/Specular PixelLevel"{
 				fixed3 ambient = UNITY_LIGHTMODEL_AMBIENT.xyz;
 
 				fixed3 worldLightDir = normalize(_WorldSpaceLightPos0.xyz);
-
 				fixed3 diffuse = _LightColor0.rgb * _Diffuse.rgb * saturate(dot(i.worldNormal, worldLightDir));
 
 				fixed3 reflectDir = normalize(reflect(-worldLightDir, i.worldNormal));
-
 				fixed3 viewDir = normalize(_WorldSpaceCameraPos.xyz - i.worldPos.xyz);
-
 				fixed3 specular = _LightColor0.rgb * _Specular.rgb * pow(saturate(dot(reflectDir, viewDir)), _Gloss);
 
 				fixed3 color = ambient + diffuse + specular;
@@ -313,13 +306,12 @@ Shader "Unity Shader Book/Chapter 6/Specular PixelLevel"{
 		}
 	}
 	FallBack "Specular"
-
 }
 ```
 
 #### 6.5.3 Blinn-Phong光照模型
 
-```
+```c++
 Shader "Unity Shader Book/Chapter 6/BlinnPhone"{
 	Properties{
 		_Diffuse("Diffuse", Color) = (1, 1, 1, 1)
@@ -368,12 +360,10 @@ Shader "Unity Shader Book/Chapter 6/BlinnPhone"{
 				fixed3 ambient = UNITY_LIGHTMODEL_AMBIENT.xyz;
 
 				fixed3 worldLightDir = normalize(_WorldSpaceLightPos0.xyz);
-
 				fixed3 diffuse = _LightColor0.xyz * _Diffuse.xyz * saturate(dot(i.worldNormal, worldLightDir));
 
 				fixed3 viewDir = normalize(_WorldSpaceCameraPos.xyz -  i.worldPos.xyz);
 				fixed3 halfDir = normalize(worldLightDir + viewDir);
-
 				fixed3 specular = _LightColor0.xzy * _Specular.xyz * pow( saturate(dot(i.worldNormal, halfDir)), _Gloss);
 			
 				fixed3 color = ambient + diffuse + specular;
@@ -387,6 +377,8 @@ Shader "Unity Shader Book/Chapter 6/BlinnPhone"{
 
 }
 ```
+
+- Blinn-Phong和Phong相比，计算更简单，前者计算半程向量，后者计算反射。前者在视线贴近物体表面时更符合物理现象，高光会被拉长
 
 ### 6.6 使用Unity内置的函数
 
