@@ -457,11 +457,79 @@ f(expr);
     class Widget{
     public:
     	void f() &;			// 仅在 *this 为左值时调用
-    	void f() &&;		// 仅在 *this 为右值时调用
+    	void f() &&;		// 仅在 *this 为右值时调用，如函数返回该类型的对象时
+        
+        std::vector<int> datas;
     }
+    Widget makeWidget();
+    auto datas = makeWidget().datas;		// 此时返回了一个右值 Widget 对象，所以可以不用复制，直接移动 datas 即可
     ```
 
 - C++ 提供了 override 声明来显示的标明派生类的函数是为了改写基类版本，且一旦这样， 编译器就会检查所有和改写相关的问题
 
 - C++11 的 override 和 final 是两个语境关键字，特点是语言会保留这些关键字，但是仅在特定的语境下。如 override 仅出现在成员函数声明的末尾才有保留意义，这代表一些遗留代码，其中已经用过 override 这个而名字的话不必因为升级到 C++11 而改名。
+
+#### 13. 优先选用 const_iterator 而非 iterator
+
+- const_iterator 时 STL 中相当于指涉到 const 指针的等价物，它们指涉到不可被修改的值，只要有可能就应该使用 const 标准的标准表明，任何时候只需要一个迭代器而不需要修改其指涉内容的，就应该使用 const_iterator，这对于 C++98 和 C++11 都成立。
+
+  C++98 中建立 const_iterator 不容易，且使用的方式很局限，所以有些情况下可以不使用：
+
+  ```c++
+  std::vector<int> vec;
+  std::vector<int>::const_iterator ci = std::find(static_cast<std::vector<int>::const_iterator>(vec.begin()),
+                                                 static_cast<std::vector<int>::const_iterator>(vec.end()), 1983);
+  vec.insert(static_cast<std::vector<int>::iterator>(ci), 1998);		// 可能会编译错误
+  ```
+
+  - 非 const 容器没有什么简单的方法得到对应的 const 容器，这里是通过强制类型转换，但也可以通过其他方法，但都需要费些功夫
+  - C++98 中，插入、删除等位置只能通过 iterator 指定，而不接受 const_iterator
+  - const_iterator 到 iterator 并不存在可以指的类型转换，static_const 甚至是 reinterpret_cast 也不行（C++98 和 C++11 都是如此）
+
+  C++ 11 中，获取 const_iterator 变得容易了，const 和非 const 的容器的成员函数 cbegin 和 cend 都返回 const_iterator，且 STL 成员函数若使用指定位置的迭代器来插入或删除等也要求使用 const_iterator，但 C++11 中并未添加非成员版本的 cbegin、cend、rbegin、rend、crbegin、crend，所以若想使用非成员版本的来写最通用的函数，则只能自己去实现这些方法的非成员版本：
+
+  ```c++
+  // C++14 可以正常运行，C++11 则不行
+  template<typename Container, typename Val>
+  void findAndInster(Container& container, const Val& targetVal, const Val& insertVal){
+      auto it = std::find(std::cbegin(container), std::cend(container), targetVal);
+      
+      container.insert(it, insertVal);
+  }
+  
+  // 对非成员版本的 begin 传入 const 容器会产生一个 const_iterator，对是否提供 cbegin 的成员函数的容器都适用 
+  template<typename Container>
+  auto cbegin(const Container& container)->decltype(std::begin(container)){
+      return std::begin(container);
+  }
+  ```
+
+#### 14. 只要函数不会发射异常，就为其加上 noexcept 声明
+
+- C++98 中，必须树立出一个函数可能发射的所有异常类型，所以若函数实现做了改动，那么异常规格也难免要修订，而改动异常规格可能会破坏客户代码，因为调用方可能依赖于之前的异常规格。编译器通常不会再保持函数实现、异常规格和客户代码的一致性方面提供什么帮助。
+
+- C++11 中，函数发射异常中真正重要的信息是会不会发射，无条件的 noexcept 就是给不会发射异常的函数准备的。函数是否加上该声明事关接口设计，它是客户方关注的核心，调用方可以查询函数的 noexcept 状态，而查询结果可能会影响调用代码。若明知函数不会发射异常却不给 noexcept 声明，就是接口规格缺陷。
+
+  对于不会发生异常的函数使用 noexcept 声明可以让编译器生成更好的代码：
+
+  ```c++
+  void f() throw();				// C++98
+  void f() noexcept;				// C++11
+  ```
+
+  在运行期，一个异常逃逸 f 的作用域，则 f 的异常规格被违反，C++98 异常规格下，调用栈会开解至 f 的调用方，然后执行一些操作，程序执行终止。C++11 异常规格下，程序执行终止前，栈只是可能会开解，所以优化器不需要在异常传出函数的前提下将执行期栈保持在可开解状态，也不需要在异常逃逸函数的前提下，保证所有其中的函数其中的对象以构造顺序的逆序完成析构。
+
+- 实例：
+
+  1. std::vector：
+
+     ```c++
+     std::vector<Widget> wVec;
+     Widget w;
+     wVec.push_back(w);
+     ```
+
+     向 std::vector 中添加新元素可能会空间不够，该情况发生时，std::vector 对象会分配一个新的、更大的内存块，然后把元素从现存的内存块转移到新的。
+
+     C++98 中是先把元素逐个从旧内存复制到新内存，然后将旧内存中的对象析构，该做法使 push_back 能提供强异常安全保证，若在复制元素过程中抛出了异常，则 std::vector 对象会保持不变。
 
